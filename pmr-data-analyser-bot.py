@@ -7,6 +7,8 @@ import os
 from datetime import datetime, timedelta
 import csv
 
+import pandas as pd
+
 logger = logging.getLogger("my_bot")
 logger.setLevel(logging.INFO)
 
@@ -56,6 +58,48 @@ async def get_recent_messages(channel, limit):
             message_list.append(message)
 
     return message_list
+
+async def extract_key_message_fields(message: discord.message.Message):
+    content = message.content
+    author = message.author.name
+    date = message.created_at
+    channel_name = message.channel.name
+
+    all_info = {"date": date, "channel": channel_name, "author": author, "content": content}
+
+    return all_info
+
+@client.command()
+async def extract_channel(ctx, channel: discord.TextChannel=None, limit=None):
+    if limit is not None:
+        limit = int(limit)
+
+    if channel is None:
+        channel = ctx.channel
+    
+    messages_list = await get_recent_messages(channel, limit)
+    
+    message_info_list = [await extract_key_message_fields(message) for message in messages_list]
+    message_info_df = pd.DataFrame(message_info_list)
+
+    message_info_df.to_csv("./data/data.csv")
+
+    await ctx.send(file=discord.File("./data/data.csv"))
+
+@client.command()
+async def extract_server(ctx, limit=None):
+    if limit is not None:
+        limit = int(limit)
+    
+    messages_list = await get_recent_messages_from_all_channels(ctx.guild, limit)
+    
+    message_info_list = [await extract_key_message_fields(message) for message in messages_list]
+    message_info_df = pd.DataFrame(message_info_list)
+
+    message_info_df.to_csv("./data/data.csv")
+
+    await ctx.send(file=discord.File("./data/data.csv"))
+
 @client.command()
 async def messages_per_week(ctx, scope='channel', channel: discord.TextChannel=None, limit=None):
     """
